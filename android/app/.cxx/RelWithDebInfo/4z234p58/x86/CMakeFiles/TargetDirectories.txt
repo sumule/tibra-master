@@ -1,0 +1,2 @@
+D:/Flutter/Tibra-Master/tibra/android/app/.cxx/RelWithDebInfo/4z234p58/x86/CMakeFiles/edit_cache.dir
+D:/Flutter/Tibra-Master/tibra/android/app/.cxx/RelWithDebInfo/4z234p58/x86/CMakeFiles/rebuild_cache.dir

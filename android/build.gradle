@@ -1,0 +1,39 @@
+buildscript {
+    ext.kotlin_version = '1.8.22' // Use the required Kotlin version
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://storage.googleapis.com/download.flutter.io' }
+        maven { url 'https://plugins.gradle.org/m2/' }
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:7.0.2"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://storage.googleapis.com/download.flutter.io' }
+        maven { url 'https://plugins.gradle.org/m2/' }
+    }
+}
+
+rootProject.buildDir = "../build"
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty("kotlin_version")) {
+            project.ext.kotlin_version = '1.8.22' // Ensure all subprojects use the same version
+        }
+    }
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}

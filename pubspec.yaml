@@ -1,0 +1,45 @@
+name: tibra
+description: "Get a Better Sleep"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  audioplayers: ^6.1.0
+  just_audio: ^0.9.40
+  shared_preferences: ^2.0.18
+  path_provider: ^2.0.11
+  csv: ^5.0.0
+  font_awesome_flutter: ^10.8.0
+  flutter_local_notifications: ^18.0.1
+  flutter_launcher_icons: ^0.14.2
+  timezone: ^0.10.0
+  permission_handler: ^11.3.1
+  alarm: ^4.1.1
+  mongo_dart: ^0.10.4
+  share_plus: ^10.1.4
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+dependency_overrides:
+  collection: ^1.19.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/audio/
+    - assets/alarm_sound.mp3
+    - assets/background.jpg
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/TIBRA.png"

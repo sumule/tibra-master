@@ -1,0 +1,386 @@
+import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:alarm/alarm.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../main.dart'; // Import main.dart to access flutterLocalNotificationsPlugin
+import '../color.dart';
+
+class AlarmSettingsPage extends StatefulWidget {
+  const AlarmSettingsPage({super.key});
+
+  @override
+  _AlarmSettingsPageState createState() => _AlarmSettingsPageState();
+}
+
+class _AlarmSettingsPageState extends State<AlarmSettingsPage> {
+  final List<String> _daysOfWeek = [
+    'Senin',
+    'Selasa',
+    'Rabu',
+    'Kamis',
+    'Jumat',
+    'Sabtu',
+    'Minggu'
+  ];
+  final Map<String, bool> _selectedDays = {
+    'Senin': false,
+    'Selasa': false,
+    'Rabu': false,
+    'Kamis': false,
+    'Jumat': false,
+    'Sabtu': false,
+    'Minggu': false,
+  };
+  TimeOfDay _selectedTime = TimeOfDay.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _requestPermissions();
+    _loadSettings();
+  }
+
+  void _requestPermissions() async {
+    if (await Permission.scheduleExactAlarm.isDenied) {
+      await Permission.scheduleExactAlarm.request();
+    }
+  }
+
+  void _selectTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime,
+      builder: (BuildContext context, Widget? child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _selectedTime) {
+      setState(() {
+        _selectedTime = picked;
+      });
+    }
+  }
+
+  void _saveSettings() async {
+    final selectedDaysCount =
+        _selectedDays.values.where((isSelected) => isSelected).length;
+    if (selectedDaysCount < 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content:
+                Text('Pilihan alarm paling sedikit 3 hari dalam 1 minggu')),
+      );
+      return;
+    }
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('selectedDays',
+        _selectedDays.keys.where((day) => _selectedDays[day]!).toList());
+    await prefs.setInt('selectedHour', _selectedTime.hour);
+    await prefs.setInt('selectedMinute', _selectedTime.minute);
+
+    _scheduleAlarms();
+    Navigator.pop(context);
+  }
+
+  void _loadSettings() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String>? selectedDays = prefs.getStringList('selectedDays');
+    int? selectedHour = prefs.getInt('selectedHour');
+    int? selectedMinute = prefs.getInt('selectedMinute');
+
+    if (selectedDays != null) {
+      setState(() {
+        for (var day in _daysOfWeek) {
+          _selectedDays[day] = selectedDays.contains(day);
+        }
+      });
+    }
+
+    if (selectedHour != null && selectedMinute != null) {
+      setState(() {
+        _selectedTime = TimeOfDay(hour: selectedHour, minute: selectedMinute);
+      });
+    }
+  }
+
+  void _scheduleAlarms() {
+    for (var day in _daysOfWeek) {
+      if (_selectedDays[day]!) {
+        final dayOfWeek = _daysOfWeek.indexOf(day) + 1;
+        _scheduleAlarm(dayOfWeek);
+      }
+    }
+  }
+
+  // void _scheduleAlarm(int dayOfWeek) async {
+  //   final now = DateTime.now();
+  //   final scheduledDate = DateTime(
+  //     now.year,
+  //     now.month,
+  //     now.day,
+  //     _selectedTime.hour,
+  //     _selectedTime.minute,
+  //   ).add(Duration(days: (dayOfWeek - now.weekday + 7) % 7));
+
+  //   final alarmSettings = AlarmSettings(
+  //     // id: dayOfWeek,
+  //     id: 1314372,
+  //     dateTime: scheduledDate,
+  //     assetAudioPath: 'assets/alarm_sound.mp3',
+  //     loopAudio: true,
+  //     vibrate: true,
+  //     volume: 1,
+  //     fadeDuration: 3.0,
+  //     warningNotificationOnKill: true,
+  //     androidFullScreenIntent: false, // Set to false to allow interaction
+  //     notificationSettings: const NotificationSettings(
+  //       title: 'Alarm',
+  //       body: 'Saatnya Istirahat!',
+  //       stopButton: 'Stop the alarm',
+  //       icon: '@mipmap/ic_launcher',
+  //     ),
+  //   );
+
+  //   await Alarm.set(alarmSettings: alarmSettings);
+
+  //   // Schedule a notification to stop the alarm
+  //   _showNotification(dayOfWeek);
+  // }
+  void _scheduleAlarm(int dayOfWeek) async {
+    final now = DateTime.now();
+    final scheduledDate = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      _selectedTime.hour,
+      _selectedTime.minute,
+    ).add(Duration(days: (dayOfWeek - now.weekday + 7) % 7));
+
+    final alarmSettings = AlarmSettings(
+      id: dayOfWeek, // Use dayOfWeek as the ID
+      dateTime: scheduledDate,
+      assetAudioPath: 'assets/alarm_sound.mp3',
+      loopAudio: true,
+      vibrate: true,
+      warningNotificationOnKill: true,
+      androidFullScreenIntent: false,
+      notificationSettings: const NotificationSettings(
+        title: 'Alarm',
+        body: 'Saatnya Istirahat!',
+        stopButton: 'Stop the alarm',
+        icon: '@mipmap/ic_launcher',
+      ),
+    );
+
+    await Alarm.set(alarmSettings: alarmSettings);
+
+    // Schedule a notification to stop the alarm
+    _showNotification(dayOfWeek);
+  }
+
+  // void _showNotification(int alarmId) async {
+  //   const AndroidNotificationDetails androidPlatformChannelSpecifics =
+  //       AndroidNotificationDetails(
+  //     'alarm_channel',
+  //     'Alarm Notifications',
+  //     channelDescription: 'Channel for Alarm notifications',
+  //     importance: Importance.max,
+  //     priority: Priority.high,
+  //     fullScreenIntent: false, // Set to false to allow interaction
+  //     playSound: true,
+  //     sound: RawResourceAndroidNotificationSound('alarm_sound'),
+  //   );
+  //   const NotificationDetails platformChannelSpecifics =
+  //       NotificationDetails(android: androidPlatformChannelSpecifics);
+
+  //   await flutterLocalNotificationsPlugin.show(
+  //     alarmId,
+  //     'Alarm',
+  //     'Waktunya Istirahat',
+  //     platformChannelSpecifics,
+  //     payload: alarmId.toString(),
+  //   );
+  // }
+  void _showNotification(int alarmId) async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'alarm_channel',
+      'Alarm Notifications',
+      channelDescription: 'Channel for Alarm notifications',
+      importance: Importance.max,
+      priority: Priority.high,
+      fullScreenIntent: false,
+      playSound: true,
+      sound: RawResourceAndroidNotificationSound('alarm_sound'),
+      actions: [
+        AndroidNotificationAction(
+          'stop_alarm',
+          'Stop Alarm',
+          cancelNotification: true, // Dismiss the notification when pressed
+        ),
+      ],
+    );
+
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+
+    await flutterLocalNotificationsPlugin.show(
+      alarmId,
+      'Alarm',
+      'Waktunya Istirahat',
+      platformChannelSpecifics,
+      payload: 'stop_alarm', // Use a payload to identify the action
+    );
+  }
+
+  // void _stopAlarm(int id) async {
+  //   await Alarm.stop(id);
+  //   await flutterLocalNotificationsPlugin.cancel(id);
+  // }
+  void _stopAlarms() async {
+    for (var day in _daysOfWeek) {
+      if (_selectedDays[day]!) {
+        final dayOfWeek = _daysOfWeek.indexOf(day) + 1;
+        await Alarm.stop(dayOfWeek);
+        await flutterLocalNotificationsPlugin.cancel(dayOfWeek);
+      }
+    }
+  }
+
+  String formatTimeOfDay(TimeOfDay time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Pengaturan Alarm',
+            style: TextStyle(color: primaryColor, fontSize: 32)),
+        backgroundColor: secondaryColor,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: primaryColor),
+          onPressed: () {
+            Navigator.pop(context); // This ensures it goes back
+          },
+        ),
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [secondaryColor, accentColor],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            stops: gradientstop,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              const Text(
+                'Pilih Hari:',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor),
+              ),
+              Expanded(
+                child: ListView(
+                  children: _daysOfWeek.map((day) {
+                    return Card(
+                      color: secondaryColor,
+                      margin: const EdgeInsets.symmetric(
+                          vertical: 10, horizontal: 15),
+                      child: Theme(
+                        data: Theme.of(context).copyWith(
+                          checkboxTheme: CheckboxThemeData(
+                            side: WidgetStateBorderSide.resolveWith(
+                              (states) {
+                                if (states.contains(WidgetState.selected)) {
+                                  return const BorderSide(
+                                      color: primaryColor, width: 2);
+                                }
+                                return const BorderSide(
+                                    color: primaryColor,
+                                    width: 2); // Unchecked border color
+                              },
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(4), // Rounded corners
+                            ),
+                          ),
+                        ),
+                        child: ListTile(
+                          leading: Transform.scale(
+                            scale: 1.5, // Optional: Adjust size if needed
+                            child: Checkbox(
+                              value: _selectedDays[day],
+                              onChanged: (bool? value) {
+                                setState(() {
+                                  _selectedDays[day] = value ?? false;
+                                });
+                              },
+                              activeColor:
+                                  primaryColor, // Checkbox fill color when selected
+                              checkColor: secondaryColor, // Checkmark color
+                            ),
+                          ),
+                          title: Text(
+                            day,
+                            style: const TextStyle(color: primaryColor),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Pilih Waktu Alarm:',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor),
+              ),
+              TextButton(
+                onPressed: () => _selectTime(context),
+                child: Text('Pilih Waktu: ${formatTimeOfDay(_selectedTime)}',
+                    style: const TextStyle(color: primaryColor)),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      primaryColor, // Set the background color of the button
+                  foregroundColor:
+                      secondaryColor, // Set the text color of the button
+                ),
+                onPressed: _saveSettings,
+                child: const Text('Simpan Pengaturan'),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: secondaryColor,
+                ),
+                onPressed: _stopAlarms,
+                child: const Text('Stop Alarm'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
